@@ -9,11 +9,23 @@ import (
 	"time"
 )
 
+const (
+	Iterations = 50
+	Trials = 100
+)
+
+var winners = map[string]int{}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	if err := play(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	for i := 0; i < Trials; i++ {
+		if err := play(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	for name, wins := range winners {
+		fmt.Println(wins, "wins for", name)
 	}
 }
 
@@ -23,9 +35,9 @@ func play() error {
 		return err
 	}
 	player1 := scrabble.NewComputerPlayer("TJ",
-		scrabble.NewMCTSStrategy(15 * time.Second))
+		scrabble.NewRandomStrategy())
 	player2 := scrabble.NewComputerPlayer("Justine",
-		scrabble.MostPointsStrategy)
+		scrabble.NewRandomStrategy())
 	game := scrabble.NewGame(root, player1, player2)
 	for !game.Over() {
 		fmt.Println(game.String())
@@ -38,5 +50,8 @@ func play() error {
 	}
 	fmt.Println(game.String())
 	fmt.Println("Game over!")
+	for _, p := range game.Winners() {
+		winners[p.Name()]++
+	}
 	return nil
 }

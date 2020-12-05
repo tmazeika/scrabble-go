@@ -6,7 +6,6 @@ import (
 	. "github.com/tmazeika/scrabble-go/internal/move"
 	"math/rand"
 	"sync"
-	"time"
 )
 
 type StrategyFunc func(game *Game, moves []Move) Move
@@ -47,7 +46,7 @@ func MostPointsStrategy(game *Game, moves []Move) Move {
 	return best
 }
 
-func NewMCTSStrategy(runtime time.Duration) StrategyFunc {
+func NewMCTSStrategy(runtime int) StrategyFunc {
 	return func(game *Game, moves []Move) Move {
 		if len(moves) == 0 {
 			return Move{Skip: true}

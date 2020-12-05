@@ -8,11 +8,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 )
 
-const PickTop = 10
-const C = math.Sqrt2
+const (
+	C       = math.Sqrt2
+	PickTop = 10
+)
 
 type MCTSNode struct {
 	mu *sync.RWMutex
@@ -119,14 +120,12 @@ func rollout(state *Game, playerName string) int {
 			panic(err)
 		}
 	}
-	wonBy := state.WonBy(playerName)
-	if wonBy < 0 {
+	if wonBy := state.WonBy(playerName); wonBy < 0 {
 		return -1
 	} else if wonBy == 0 {
 		return 0
-	} else {
-		return 1
 	}
+	return 1
 }
 
 func (n *MCTSNode) backPropagate(score int) {
@@ -147,7 +146,7 @@ func (n *MCTSNode) bestChild() *MCTSNode {
 	return best
 }
 
-func mcts(state *Game, moves []Move, runtime time.Duration) Move {
+func mcts(state *Game, moves []Move, runtime int) Move {
 	playerName := state.CurrentPlayer().Name()
 	root := MCTSNode{
 		mu:    &sync.RWMutex{},
@@ -156,21 +155,14 @@ func mcts(state *Game, moves []Move, runtime time.Duration) Move {
 	}
 	root.expandExisting(getTopMoves(state.Board, moves))
 	sem := make(chan struct{}, 2)
-	timer := time.NewTimer(runtime)
-	var rolloutN int
-	for {
-		select {
-		case sem <- struct{}{}:
-			root.search(playerName, sem)
-			rolloutN++
-		case <-timer.C:
-			root.wg.Wait()
-			// TODO
-			// fmt.Println(root.String())
-			fmt.Printf("MCTS stats: %d rollouts completed\n", rolloutN)
-			return root.bestChild().m
-		}
+	i := 0
+	for ; i < runtime; i++ {
+		sem <- struct{}{}
+		root.search(playerName, sem)
 	}
+	root.wg.Wait()
+	fmt.Printf("MCTS stats: %d rollouts completed\n", i)
+	return root.bestChild().m
 }
 
 func getTopMoves(b *board.Board, m []Move) []Move {
