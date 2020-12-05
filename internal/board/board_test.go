@@ -16,6 +16,17 @@ func abcBoard() *Board {
 	return b
 }
 
+func TestBoard_Copy(t *testing.T) {
+	b := abcBoard()
+	b.SetAcross(1, 1, "XY")
+	b2 := b.Copy()
+	b2.SetAcross(0, 0, "TJ")
+	assert.Equal(t, Letter('A'), b.At(0, 0).Letter())
+	assert.Equal(t, Letter('X'), b.At(1, 1).Letter())
+	assert.Equal(t, Letter('T'), b2.At(0, 0).Letter())
+	assert.Equal(t, Letter('X'), b2.At(1, 1).Letter())
+}
+
 func TestBoard_At(t *testing.T) {
 	b := abcBoard()
 	letterIdx := 0

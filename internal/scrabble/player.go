@@ -19,6 +19,7 @@ type Player interface {
 	UseRack(letters []Letter)
 	DrawFrom(bag *bag.Bag)
 	Play(game *Game) Move
+	CopyAsAI(strategy StrategyFunc) Player
 }
 
 type basePlayer struct {
@@ -64,6 +65,19 @@ func (p *basePlayer) UseRack(letters []Letter) {
 
 func (p *basePlayer) DrawFrom(bag *bag.Bag) {
 	p.rack = append(p.rack, bag.Draw(rules.RackSize-len(p.rack))...)
+}
+
+func (p *basePlayer) CopyAsAI(strategy StrategyFunc) Player {
+	p2 := ComputerPlayer{
+		basePlayer: basePlayer{
+			name:   p.name,
+			points: p.points,
+			rack:   make([]Letter, len(p.rack)),
+		},
+		strategy: strategy,
+	}
+	copy(p2.rack, p.rack)
+	return &p2
 }
 
 func (p *basePlayer) String() string {

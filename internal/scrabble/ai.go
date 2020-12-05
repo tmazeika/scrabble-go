@@ -6,47 +6,53 @@ import (
 	. "github.com/tmazeika/scrabble-go/internal/move"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 type StrategyFunc func(game *Game, moves []Move) Move
 
-func NewRandomStrategy(rnd rand.Rand) StrategyFunc {
+func NewRandomStrategy() StrategyFunc {
 	return func(game *Game, moves []Move) Move {
 		if len(moves) == 0 {
 			return Move{Skip: true}
 		}
-		return moves[rnd.Intn(len(moves))]
+		return moves[rand.Intn(len(moves))]
 	}
 }
 
-func NewLongestStrategy() StrategyFunc {
-	return func(game *Game, moves []Move) Move {
-		if len(moves) == 0 {
-			return Move{Skip: true}
-		}
-		longest := moves[0]
-		for _, m := range moves[1:] {
-			if len(m.Word) > len(longest.Word) {
-				longest = m
-			}
-		}
-		return longest
+func NewLongestStrategy(_ *Game, moves []Move) Move {
+	if len(moves) == 0 {
+		return Move{Skip: true}
 	}
+	longest := moves[0]
+	for _, m := range moves[1:] {
+		if len(m.Word) > len(longest.Word) {
+			longest = m
+		}
+	}
+	return longest
 }
 
-func NewMostPointsStrategy() StrategyFunc {
+func MostPointsStrategy(game *Game, moves []Move) Move {
+	if len(moves) == 0 {
+		return Move{Skip: true}
+	}
+	best, bestPoints := moves[0], game.Board.Points(moves[0])
+	for _, m := range moves[1:] {
+		points := game.Board.Points(m)
+		if points > bestPoints {
+			best, bestPoints = m, points
+		}
+	}
+	return best
+}
+
+func NewMCTSStrategy(runtime time.Duration) StrategyFunc {
 	return func(game *Game, moves []Move) Move {
 		if len(moves) == 0 {
 			return Move{Skip: true}
 		}
-		best, bestPoints := moves[0], game.Board.Points(moves[0])
-		for _, m := range moves[1:] {
-			points := game.Board.Points(m)
-			if points > bestPoints {
-				best, bestPoints = m, points
-			}
-		}
-		return best
+		return mcts(game, moves, runtime)
 	}
 }
 
@@ -119,9 +125,16 @@ func getAcrossMoves(dict *Node, b *board.Board, rack []Letter) <-chan Move {
 		if len(anchors) == 0 {
 			anchors = []*board.Tile{b.Center()}
 		}
+		var wg sync.WaitGroup
+		wg.Add(len(anchors))
 		for _, a := range anchors {
-			getAcrossAnchorMoves(dict, b, rack, a, getK(a), out)
+			a := a
+			go func() {
+				defer wg.Done()
+				getAcrossAnchorMoves(dict, b, rack, a, getK(a), out)
+			}()
 		}
+		wg.Wait()
 		close(out)
 	}()
 	return out

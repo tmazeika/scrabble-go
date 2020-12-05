@@ -10,12 +10,20 @@ type Bag struct {
 	letters []Letter
 }
 
-func New(rnd *rand.Rand) *Bag {
+func New() *Bag {
 	ls := LettersDist()
-	rnd.Shuffle(len(ls), func(i, j int) {
+	rand.Shuffle(len(ls), func(i, j int) {
 		ls[i], ls[j] = ls[j], ls[i]
 	})
 	return &Bag{ls}
+}
+
+func (b *Bag) Copy() *Bag {
+	b2 := Bag{
+		letters: make([]Letter, len(b.letters)),
+	}
+	copy(b2.letters, b.letters)
+	return &b2
 }
 
 func (b *Bag) Draw(n int) []Letter {

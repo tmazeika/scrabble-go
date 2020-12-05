@@ -33,33 +33,38 @@ func New(size int) *Board {
 	return &b
 }
 
-func (b *Board) CopyTransposed() *Board {
+func (b *Board) Copy() *Board {
 	staleY := *b.staleY
 	staleX := *b.staleX
 	tiles := make([]*Tile, len(b.tiles))
 	b2 := Board{
-		staleX: &staleY,
-		staleY: &staleX,
+		staleX: &staleX,
+		staleY: &staleY,
 		size:   b.size,
 		tiles:  tiles,
 	}
 	for i, t := range b.tiles {
 		letter := *t.letter
-		crossCheckX := make(map[Letter]struct{}, len(*t.crossCheckX))
-		crossCheckY := make(map[Letter]struct{}, len(*t.crossCheckY))
-		for k, v := range *t.crossCheckX {
-			crossCheckX[k] = v
+		var crossCheckX map[Letter]struct{}
+		var crossCheckY map[Letter]struct{}
+		if *t.crossCheckX != nil {
+			crossCheckX = make(map[Letter]struct{}, len(*t.crossCheckX))
+			for k, v := range *t.crossCheckX {
+				crossCheckX[k] = v
+			}
 		}
-		for k, v := range *t.crossCheckY {
-			crossCheckY[k] = v
+		if *t.crossCheckY != nil {
+			crossCheckY = make(map[Letter]struct{}, len(*t.crossCheckY))
+			for k, v := range *t.crossCheckY {
+				crossCheckY[k] = v
+			}
 		}
-		i2 := (i%b.size)*b.size + i/b.size
-		tiles[i2] = &Tile{
+		tiles[i] = &Tile{
 			letter:      &letter,
 			board:       &b2,
-			i:           i2,
-			crossCheckX: &crossCheckY,
-			crossCheckY: &crossCheckX,
+			i:           i,
+			crossCheckX: &crossCheckX,
+			crossCheckY: &crossCheckY,
 		}
 	}
 	return &b2

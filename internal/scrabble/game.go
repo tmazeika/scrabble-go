@@ -5,9 +5,8 @@ import (
 	"github.com/tmazeika/scrabble-go/internal/bag"
 	"github.com/tmazeika/scrabble-go/internal/board"
 	. "github.com/tmazeika/scrabble-go/internal/dict"
-	"github.com/tmazeika/scrabble-go/internal/move"
+	. "github.com/tmazeika/scrabble-go/internal/move"
 	"github.com/tmazeika/scrabble-go/internal/rules"
-	"math/rand"
 	"strings"
 )
 
@@ -17,13 +16,15 @@ type Game struct {
 	Players []Player
 	Dict    *Node
 	Round   int
+
+	over bool
 }
 
-func NewGame(rnd *rand.Rand, dict *Node, players ...Player) *Game {
+func NewGame(dict *Node, players ...Player) *Game {
 	if len(players) < 0 {
 		panic("nonpositive player count")
 	}
-	b := bag.New(rnd)
+	b := bag.New()
 	for _, p := range players {
 		p.DrawFrom(b)
 	}
@@ -35,18 +36,34 @@ func NewGame(rnd *rand.Rand, dict *Node, players ...Player) *Game {
 	}
 }
 
-func (g *Game) PlayRound() error {
+func (g *Game) AICopy(strategy StrategyFunc) *Game {
+	players := make([]Player, len(g.Players))
+	for i, p := range g.Players {
+		players[i] = p.CopyAsAI(strategy)
+	}
+	return &Game{
+		Bag:     g.Bag.Copy(),
+		Board:   g.Board.Copy(),
+		Players: players,
+		Dict:    g.Dict,
+		Round:   g.Round,
+		over:    g.over,
+	}
+}
+
+func (g *Game) PlayRound() (string, error) {
+	return g.playMove(g.CurrentPlayer().Play(g))
+}
+
+func (g *Game) playMove(m Move) (string, error) {
 	player := g.CurrentPlayer()
-	m := player.Play(g)
-	fmt.Println()
 	if m.Skip {
-		fmt.Printf("Skipping %s's turn.\n", player.Name())
 		g.Round++
-		return nil
+		return fmt.Sprintf("\nSkipping %s's turn.\n", player.Name()), nil
 	}
 	b := g.Board
 	// Normalize.
-	if m.Dir == move.DirDown {
+	if m.Dir == DirDown {
 		b = b.Transposed()
 		m = m.Transposed()
 	}
@@ -54,42 +71,43 @@ func (g *Game) PlayRound() error {
 
 	// Validation.
 	if !b.FitsAcross(m.Row, m.Col, len(m.Word)) {
-		return fmt.Errorf("move would fall off the board: %v", m)
+		return "", fmt.Errorf("move would fall off the board: %v", m)
 	}
 	if !makesValidWords(g.Dict, b, m) {
-		return fmt.Errorf("invalid word(s) would be created: %v", m)
+		return "", fmt.Errorf("invalid word(s) would be created: %v", m)
 	}
 	needed := neededFromRack(b, m)
 	if len(needed) == 0 {
-		return fmt.Errorf("must put down at least one letter from the rack: %v", m)
+		return "", fmt.Errorf("must put down at least one letter from the rack: %v", m)
 	}
 	if !player.InRack(needed) {
-		return fmt.Errorf("required letters %q are not in rack: %v", needed, m)
+		return "", fmt.Errorf("required letters %q are not in rack: %v", needed, m)
 	}
 	if g.Round == 0 && !passesThroughCenter(b, m) {
-		return fmt.Errorf("first move must pass through the center: %v", m)
+		return "", fmt.Errorf("first move must pass through the center: %v", m)
 	}
 	if g.Round > 0 && !touchesAnything(b, m) {
-		return fmt.Errorf("move must build off an existing move: %v", m)
+		return "", fmt.Errorf("move must build off an existing move: %v", m)
 	}
 
 	// Perform.
 	points := b.Points(m)
-	fmt.Printf("You scored %d points!\n", points)
 	player.AddPoints(points)
 	player.UseRack(needed)
 	player.DrawFrom(g.Bag)
 	b.SetAcross(m.Row, m.Col, m.Word)
 	g.Round++
-	return nil
+	return fmt.Sprintf("\nYou scored %d points!\n", points), nil
 }
 
 func (g *Game) Over() bool {
+	defer g.onOver(g.over)
 	if !g.Bag.Empty() {
 		return false
 	}
 	for _, p := range g.Players {
 		if len(p.Rack()) == 0 {
+			g.over = true
 			return true
 		}
 	}
@@ -98,7 +116,58 @@ func (g *Game) Over() bool {
 			return false
 		}
 	}
+	g.over = true
 	return true
+}
+
+func (g *Game) onOver(before bool) {
+	if before == g.over {
+		return
+	}
+	totalSum := 0
+	for _, p := range g.Players {
+		rackSum := 0
+		for _, l := range p.Rack() {
+			rackSum += l.Points()
+		}
+		p.AddPoints(-rackSum)
+		totalSum += rackSum
+	}
+	for _, p := range g.Players {
+		if len(p.Rack()) == 0 {
+			p.AddPoints(totalSum)
+		}
+	}
+}
+
+func (g *Game) Winners() []Player {
+	if !g.over {
+		panic("game may not be over")
+	}
+	best, bestPoints := []Player{g.Players[0]}, g.Players[0].Points()
+	for _, p := range g.Players[1:] {
+		points := p.Points()
+		if points > bestPoints {
+			best, bestPoints = []Player{p}, points
+		} else if points == bestPoints {
+			best = append(best, p)
+		}
+	}
+	return best
+}
+
+func (g *Game) WonBy(name string) int {
+	playerPoints := 0
+	best := 0
+	for _, p := range g.Players {
+		points := p.Points()
+		if p.Name() == name {
+			playerPoints = points
+		} else if points > best {
+			best = points
+		}
+	}
+	return playerPoints - best
 }
 
 func (g *Game) String() string {
@@ -115,7 +184,7 @@ func (g *Game) CurrentPlayer() Player {
 	return g.Players[g.Round%len(g.Players)]
 }
 
-func makesValidWords(dict *Node, b *board.Board, m move.Move) bool {
+func makesValidWords(dict *Node, b *board.Board, m Move) bool {
 	t := b.At(m.Row, m.Col)
 	// Valid down.
 	for i, l := range m.Word {
@@ -131,7 +200,7 @@ func makesValidWords(dict *Node, b *board.Board, m move.Move) bool {
 	return dict.Search(left + m.Word + right).Accept()
 }
 
-func neededFromRack(b *board.Board, m move.Move) []Letter {
+func neededFromRack(b *board.Board, m Move) []Letter {
 	t := b.At(m.Row, m.Col)
 	needed := make([]Letter, 0, len(m.Word))
 	for i, l := range m.Word {
@@ -142,7 +211,7 @@ func neededFromRack(b *board.Board, m move.Move) []Letter {
 	return needed
 }
 
-func touchesAnything(b *board.Board, m move.Move) bool {
+func touchesAnything(b *board.Board, m Move) bool {
 	t := b.At(m.Row, m.Col)
 	for i := range m.Word {
 		if !t.RightN(i).EmptyAround() {
@@ -152,7 +221,7 @@ func touchesAnything(b *board.Board, m move.Move) bool {
 	return false
 }
 
-func passesThroughCenter(b *board.Board, m move.Move) bool {
+func passesThroughCenter(b *board.Board, m Move) bool {
 	t := b.At(m.Row, m.Col)
 	for i := range m.Word {
 		if t.RightN(i).Center() {

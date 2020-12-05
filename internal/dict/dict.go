@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -120,10 +121,17 @@ func (l Letter) Points() int {
 }
 
 func LettersDist() []Letter {
+	keys := make([]int, len(letterProps))
+	for l := range letterProps {
+		keys = append(keys, int(l))
+	}
+	sort.Ints(keys)
 	var ls []Letter
-	for l, p := range letterProps {
+	for _, k := range keys {
+		k := Letter(k)
+		p := letterProps[k]
 		for i := 0; i < p.count; i++ {
-			ls = append(ls, l)
+			ls = append(ls, k)
 		}
 	}
 	return ls
