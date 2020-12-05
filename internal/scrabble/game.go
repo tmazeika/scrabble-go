@@ -83,10 +83,10 @@ func (g *Game) playMove(m Move) (string, error) {
 	if !player.InRack(needed) {
 		return "", fmt.Errorf("required letters %q are not in rack: %v", needed, m)
 	}
-	if g.Round == 0 && !passesThroughCenter(b, m) {
+	if g.Board.Center().Empty() && !passesThroughCenter(b, m) {
 		return "", fmt.Errorf("first move must pass through the center: %v", m)
 	}
-	if g.Round > 0 && !touchesAnything(b, m) {
+	if !g.Board.Center().Empty() && !touchesAnything(b, m) {
 		return "", fmt.Errorf("move must build off an existing move: %v", m)
 	}
 
