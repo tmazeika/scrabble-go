@@ -161,7 +161,7 @@ func mcts(state *Game, moves []Move, runtime int) Move {
 		root.search(playerName, sem)
 	}
 	root.wg.Wait()
-	fmt.Printf("MCTS stats: %d rollouts completed\n", i)
+	// fmt.Printf("MCTS stats: %d rollouts completed\n", i)
 	return root.bestChild().m
 }
 

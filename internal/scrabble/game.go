@@ -97,7 +97,7 @@ func (g *Game) playMove(m Move) (string, error) {
 	player.DrawFrom(g.Bag)
 	b.SetAcross(m.Row, m.Col, m.Word)
 	g.Round++
-	return fmt.Sprintf("\nYou scored %d points!\n", points), nil
+	return fmt.Sprintf("\n%s scored %d points!\n", player.Name(), points), nil
 }
 
 func (g *Game) Over() bool {

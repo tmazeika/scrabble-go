@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	Iterations = 50
-	Trials     = 300
+	Iterations = 30
+	Trials     = 1
 )
 
 var winners = map[string]int{}
@@ -22,9 +22,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	for name, wins := range winners {
-		fmt.Println(wins, "wins for", name)
-	}
+	// for name, wins := range winners {
+	// 	fmt.Println(wins, "wins for", name)
+	// }
 }
 
 func play() error {
@@ -33,27 +33,27 @@ func play() error {
 		return err
 	}
 	for i := 0; i < Trials; i++ {
-		player1 := scrabble.NewComputerPlayer("TJ",
-			scrabble.NewRandomStrategy())
-		player2 := scrabble.NewComputerPlayer("Justine",
-			scrabble.NewRandomStrategy())
+		player1 := scrabble.NewComputerPlayer("MostPoints",
+			scrabble.MostPointsStrategy)
+		player2 := scrabble.NewComputerPlayer("MCTS-AI",
+			scrabble.NewMCTSStrategy(Iterations))
 		game := scrabble.NewGame(root, player1, player2)
 		for !game.Over() {
-			// fmt.Println(game.String())
-			_, err := game.PlayRound()
+			s, err := game.PlayRound()
+			fmt.Println(game.String())
 			if err != nil {
-				panic(err)
-				// fmt.Printf("Bad move: %v\n", err)
+				fmt.Printf("Bad move: %v\n", err)
 			} else {
-				// fmt.Print(s)
+				fmt.Print(s)
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
-		// fmt.Println(game.String())
+		fmt.Println(game.String())
 		// fmt.Println("Game over!")
-		for _, p := range game.Winners() {
-			fmt.Println("Winner:", p.Name())
-			winners[p.Name()]++
-		}
+		// for _, p := range game.Winners() {
+		// 	fmt.Println("Winner:", p.Name())
+		// 	winners[p.Name()]++
+		// }
 	}
 	return nil
 }
