@@ -10,16 +10,14 @@ import (
 
 type StrategyFunc func(game *Game, moves []Move) Move
 
-func NewRandomStrategy() StrategyFunc {
-	return func(game *Game, moves []Move) Move {
-		if len(moves) == 0 {
-			return Move{Skip: true}
-		}
-		return moves[rand.Intn(len(moves))]
+func RandomStrategy(_ *Game, moves []Move) Move {
+	if len(moves) == 0 {
+		return Move{Skip: true}
 	}
+	return moves[rand.Intn(len(moves))]
 }
 
-func NewLongestStrategy(_ *Game, moves []Move) Move {
+func LongestStrategy(_ *Game, moves []Move) Move {
 	if len(moves) == 0 {
 		return Move{Skip: true}
 	}
@@ -46,12 +44,12 @@ func MostPointsStrategy(game *Game, moves []Move) Move {
 	return best
 }
 
-func NewMCTSStrategy(runtime int) StrategyFunc {
+func NewMCTSStrategy(iterations, pickTop int, c float64) StrategyFunc {
 	return func(game *Game, moves []Move) Move {
 		if len(moves) == 0 {
 			return Move{Skip: true}
 		}
-		return mcts(game, moves, runtime)
+		return mcts(game, moves, iterations, pickTop, c)
 	}
 }
 

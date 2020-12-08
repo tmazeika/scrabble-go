@@ -10,11 +10,6 @@ import (
 	"sync"
 )
 
-const (
-	C       = math.Sqrt2
-	PickTop = 10
-)
-
 type MCTSNode struct {
 	mu *sync.RWMutex
 	wg *sync.WaitGroup
@@ -22,6 +17,8 @@ type MCTSNode struct {
 	parent   *MCTSNode
 	children []*MCTSNode
 
+	pickTop int
+	c float64
 	m      Move
 	state  *Game
 	score  int
@@ -90,12 +87,13 @@ func (n *MCTSNode) ucb1() float64 {
 	visitsf := float64(n.visits)
 	parentVisitsf := float64(n.parent.visits)
 	return scoref/visitsf +
-		C*math.Sqrt(math.Log(parentVisitsf)/visitsf)
+		n.c*math.Sqrt(math.Log(parentVisitsf)/visitsf)
 }
 
 func (n *MCTSNode) expand() {
 	n.expandExisting(getTopMoves(n.state.Board,
-		AllMoves(n.state.Dict, n.state.Board, n.state.CurrentPlayer().Rack())))
+		AllMoves(n.state.Dict, n.state.Board, n.state.CurrentPlayer().Rack()),
+		n.pickTop))
 }
 
 func (n *MCTSNode) expandExisting(moves []Move) {
@@ -146,17 +144,19 @@ func (n *MCTSNode) bestChild() *MCTSNode {
 	return best
 }
 
-func mcts(state *Game, moves []Move, runtime int) Move {
+func mcts(state *Game, moves []Move, iterations, pickTop int, c float64) Move {
 	playerName := state.CurrentPlayer().Name()
 	root := MCTSNode{
 		mu:    &sync.RWMutex{},
 		wg:    &sync.WaitGroup{},
+		pickTop: pickTop,
+		c: c,
 		state: state.AICopy(nil),
 	}
-	root.expandExisting(getTopMoves(state.Board, moves))
+	root.expandExisting(getTopMoves(state.Board, moves, pickTop))
 	sem := make(chan struct{}, 2)
 	i := 0
-	for ; i < runtime; i++ {
+	for ; i < iterations; i++ {
 		sem <- struct{}{}
 		root.search(playerName, sem)
 	}
@@ -165,11 +165,11 @@ func mcts(state *Game, moves []Move, runtime int) Move {
 	return root.bestChild().m
 }
 
-func getTopMoves(b *board.Board, m []Move) []Move {
+func getTopMoves(b *board.Board, m []Move, pickTop int) []Move {
 	sort.Slice(m, func(i, j int) bool {
 		return b.Points(m[i]) > b.Points(m[j])
 	})
-	return m[:min(PickTop, len(m))]
+	return m[:min(pickTop, len(m))]
 }
 
 func min(a, b int) int {
